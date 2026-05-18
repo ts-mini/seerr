@@ -148,6 +148,12 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
     `/api/v1/tv/${router.query.tvId}/ratings`
   );
 
+  const { data: plexWatchlistStatus } = useSWR<{ onWatchlist: boolean }>(
+    user?.userType === UserType.PLEX && tv?.id
+      ? `/api/v1/watchlist/plex/status?tmdbId=${tv.id}&mediaType=${MediaType.TV}`
+      : null
+  );
+
   const sortedCrew = useMemo(
     () => sortCrewPriority(data?.credits.crew ?? []),
     [data]
@@ -162,6 +168,12 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
       });
     }
   }, [router, router.query.manage]);
+
+  useEffect(() => {
+    if (user?.userType === UserType.PLEX && plexWatchlistStatus !== undefined) {
+      setToggleWatchlist(!plexWatchlistStatus.onWatchlist);
+    }
+  }, [plexWatchlistStatus, user?.userType]);
 
   const closeBlocklistModal = useCallback(
     () => setShowBlocklistModal(false),
@@ -386,6 +398,17 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
 
       setIsUpdating(false);
     }
+
+    if (user?.userType === UserType.PLEX) {
+      try {
+        await axios.post('/api/v1/watchlist/plex', {
+          tmdbId: tv?.id,
+          mediaType: MediaType.TV,
+        });
+      } catch {
+        // Plex sync failure is non-fatal; local watchlist write already succeeded
+      }
+    }
   };
 
   const onClickDeleteWatchlistBtn = async (): Promise<void> => {
@@ -415,6 +438,16 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
       });
 
       setIsUpdating(false);
+    }
+
+    if (user?.userType === UserType.PLEX) {
+      try {
+        await axios.delete('/api/v1/watchlist/plex', {
+          params: { tmdbId: tv?.id, mediaType: MediaType.TV },
+        });
+      } catch {
+        // Plex sync failure is non-fatal; local watchlist delete already succeeded
+      }
     }
   };
 
@@ -629,41 +662,38 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
                 </Button>
               </Tooltip>
             )}
-          {data?.mediaInfo?.status !== MediaStatus.BLOCKLISTED &&
-            user?.userType !== UserType.PLEX && (
-              <>
-                {toggleWatchlist ? (
-                  <Tooltip
-                    content={intl.formatMessage(messages.addtowatchlist)}
+          {data?.mediaInfo?.status !== MediaStatus.BLOCKLISTED && (
+            <>
+              {toggleWatchlist ? (
+                <Tooltip content={intl.formatMessage(messages.addtowatchlist)}>
+                  <Button
+                    buttonType={'ghost'}
+                    className="z-40 mr-2"
+                    buttonSize={'md'}
+                    onClick={onClickWatchlistBtn}
                   >
-                    <Button
-                      buttonType={'ghost'}
-                      className="z-40 mr-2"
-                      buttonSize={'md'}
-                      onClick={onClickWatchlistBtn}
-                    >
-                      {isUpdating ? (
-                        <Spinner />
-                      ) : (
-                        <StarIcon className={'text-amber-300'} />
-                      )}
-                    </Button>
-                  </Tooltip>
-                ) : (
-                  <Tooltip
-                    content={intl.formatMessage(messages.removefromwatchlist)}
+                    {isUpdating ? (
+                      <Spinner />
+                    ) : (
+                      <StarIcon className={'text-amber-300'} />
+                    )}
+                  </Button>
+                </Tooltip>
+              ) : (
+                <Tooltip
+                  content={intl.formatMessage(messages.removefromwatchlist)}
+                >
+                  <Button
+                    className="z-40 mr-2"
+                    buttonSize={'md'}
+                    onClick={onClickDeleteWatchlistBtn}
                   >
-                    <Button
-                      className="z-40 mr-2"
-                      buttonSize={'md'}
-                      onClick={onClickDeleteWatchlistBtn}
-                    >
-                      {isUpdating ? <Spinner /> : <MinusCircleIcon />}
-                    </Button>
-                  </Tooltip>
-                )}
-              </>
-            )}
+                    {isUpdating ? <Spinner /> : <MinusCircleIcon />}
+                  </Button>
+                </Tooltip>
+              )}
+            </>
+          )}
           <div className="z-20">
             <PlayButton links={mediaLinks} />
           </div>

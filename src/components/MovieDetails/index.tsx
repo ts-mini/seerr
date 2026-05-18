@@ -150,6 +150,12 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
     `/api/v1/movie/${router.query.movieId}/ratingscombined`
   );
 
+  const { data: plexWatchlistStatus } = useSWR<{ onWatchlist: boolean }>(
+    user?.userType === UserType.PLEX && movie?.id
+      ? `/api/v1/watchlist/plex/status?tmdbId=${movie.id}&mediaType=${MediaType.MOVIE}`
+      : null
+  );
+
   const sortedCrew = useMemo(
     () => sortCrewPriority(data?.credits.crew ?? []),
     [data]
@@ -164,6 +170,12 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
       });
     }
   }, [router, router.query.manage]);
+
+  useEffect(() => {
+    if (user?.userType === UserType.PLEX && plexWatchlistStatus !== undefined) {
+      setToggleWatchlist(!plexWatchlistStatus.onWatchlist);
+    }
+  }, [plexWatchlistStatus, user?.userType]);
 
   const closeBlocklistModal = useCallback(
     () => setShowBlocklistModal(false),
@@ -355,6 +367,17 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
       });
     }
 
+    if (user?.userType === UserType.PLEX) {
+      try {
+        await axios.post('/api/v1/watchlist/plex', {
+          tmdbId: movie?.id,
+          mediaType: MediaType.MOVIE,
+        });
+      } catch {
+        // Plex sync failure is non-fatal; local watchlist write already succeeded
+      }
+    }
+
     setIsUpdating(false);
     setToggleWatchlist((prevState) => !prevState);
   };
@@ -380,10 +403,20 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
         appearance: 'error',
         autoDismiss: true,
       });
-    } finally {
-      setIsUpdating(false);
-      setToggleWatchlist((prevState) => !prevState);
     }
+
+    if (user?.userType === UserType.PLEX) {
+      try {
+        await axios.delete('/api/v1/watchlist/plex', {
+          params: { tmdbId: movie?.id, mediaType: MediaType.MOVIE },
+        });
+      } catch {
+        // Plex sync failure is non-fatal; local watchlist delete already succeeded
+      }
+    }
+
+    setIsUpdating(false);
+    setToggleWatchlist((prevState) => !prevState);
   };
 
   const onClickHideItemBtn = async (): Promise<void> => {
@@ -585,41 +618,38 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
                 </Button>
               </Tooltip>
             )}
-          {data?.mediaInfo?.status !== MediaStatus.BLOCKLISTED &&
-            user?.userType !== UserType.PLEX && (
-              <>
-                {toggleWatchlist ? (
-                  <Tooltip
-                    content={intl.formatMessage(messages.addtowatchlist)}
+          {data?.mediaInfo?.status !== MediaStatus.BLOCKLISTED && (
+            <>
+              {toggleWatchlist ? (
+                <Tooltip content={intl.formatMessage(messages.addtowatchlist)}>
+                  <Button
+                    buttonType={'ghost'}
+                    className="z-40 mr-2"
+                    buttonSize={'md'}
+                    onClick={onClickWatchlistBtn}
                   >
-                    <Button
-                      buttonType={'ghost'}
-                      className="z-40 mr-2"
-                      buttonSize={'md'}
-                      onClick={onClickWatchlistBtn}
-                    >
-                      {isUpdating ? (
-                        <Spinner />
-                      ) : (
-                        <StarIcon className={'text-amber-300'} />
-                      )}
-                    </Button>
-                  </Tooltip>
-                ) : (
-                  <Tooltip
-                    content={intl.formatMessage(messages.removefromwatchlist)}
+                    {isUpdating ? (
+                      <Spinner />
+                    ) : (
+                      <StarIcon className={'text-amber-300'} />
+                    )}
+                  </Button>
+                </Tooltip>
+              ) : (
+                <Tooltip
+                  content={intl.formatMessage(messages.removefromwatchlist)}
+                >
+                  <Button
+                    className="z-40 mr-2"
+                    buttonSize={'md'}
+                    onClick={onClickDeleteWatchlistBtn}
                   >
-                    <Button
-                      className="z-40 mr-2"
-                      buttonSize={'md'}
-                      onClick={onClickDeleteWatchlistBtn}
-                    >
-                      {isUpdating ? <Spinner /> : <MinusCircleIcon />}
-                    </Button>
-                  </Tooltip>
-                )}
-              </>
-            )}
+                    {isUpdating ? <Spinner /> : <MinusCircleIcon />}
+                  </Button>
+                </Tooltip>
+              )}
+            </>
+          )}
           <div className="z-20">
             <PlayButton links={mediaLinks} />
           </div>
