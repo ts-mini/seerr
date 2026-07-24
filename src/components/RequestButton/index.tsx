@@ -68,29 +68,41 @@ const RequestButton = ({
   const [showRequest4kModal, setShowRequest4kModal] = useState(false);
   const [editRequest, setEditRequest] = useState(false);
 
-  // All pending requests
-  const activeRequests = media?.requests.filter(
-    (request) => request.status === MediaRequestStatus.PENDING && !request.is4k
+  const openRequests = media?.requests.filter(
+    (request) =>
+      !request.is4k &&
+      request.status !== MediaRequestStatus.DECLINED &&
+      request.status !== MediaRequestStatus.COMPLETED
   );
-  const active4kRequests = media?.requests.filter(
-    (request) => request.status === MediaRequestStatus.PENDING && request.is4k
+  const open4kRequests = media?.requests.filter(
+    (request) =>
+      request.is4k &&
+      request.status !== MediaRequestStatus.DECLINED &&
+      request.status !== MediaRequestStatus.COMPLETED
   );
 
-  // Current user's pending request, or the first pending request
+  const pendingRequests = openRequests?.filter(
+    (request) => request.status === MediaRequestStatus.PENDING
+  );
+  const pending4kRequests = open4kRequests?.filter(
+    (request) => request.status === MediaRequestStatus.PENDING
+  );
+
+  // Current user's open request, or the first open request
   const activeRequest = useMemo(() => {
-    return activeRequests && activeRequests.length > 0
-      ? (activeRequests.find(
+    return openRequests && openRequests.length > 0
+      ? (openRequests.find(
           (request) => request.requestedBy.id === user?.id
-        ) ?? activeRequests[0])
+        ) ?? openRequests[0])
       : undefined;
-  }, [activeRequests, user]);
+  }, [openRequests, user]);
   const active4kRequest = useMemo(() => {
-    return active4kRequests && active4kRequests.length > 0
-      ? (active4kRequests.find(
+    return open4kRequests && open4kRequests.length > 0
+      ? (open4kRequests.find(
           (request) => request.requestedBy.id === user?.id
-        ) ?? active4kRequests[0])
+        ) ?? open4kRequests[0])
       : undefined;
-  }, [active4kRequests, user]);
+  }, [open4kRequests, user]);
 
   const modifyRequest = async (
     request: MediaRequest,
@@ -129,7 +141,7 @@ const RequestButton = ({
     if (
       activeRequest &&
       (activeRequest.requestedBy.id === user?.id ||
-        (activeRequests?.length === 1 &&
+        (openRequests?.length === 1 &&
           hasPermission(Permission.MANAGE_REQUESTS)))
     ) {
       buttons.push({
@@ -144,7 +156,8 @@ const RequestButton = ({
     }
 
     if (
-      activeRequest &&
+      pendingRequests &&
+      pendingRequests.length > 0 &&
       hasPermission(Permission.MANAGE_REQUESTS) &&
       mediaType === 'movie'
     ) {
@@ -153,7 +166,7 @@ const RequestButton = ({
           id: 'approve-request',
           text: intl.formatMessage(messages.approverequest),
           action: () => {
-            modifyRequest(activeRequest, 'approve');
+            modifyRequest(pendingRequests[0], 'approve');
           },
           svg: <CheckIcon />,
         },
@@ -161,14 +174,14 @@ const RequestButton = ({
           id: 'decline-request',
           text: intl.formatMessage(messages.declinerequest),
           action: () => {
-            modifyRequest(activeRequest, 'decline');
+            modifyRequest(pendingRequests[0], 'decline');
           },
           svg: <XMarkIcon />,
         }
       );
     } else if (
-      activeRequests &&
-      activeRequests.length > 0 &&
+      pendingRequests &&
+      pendingRequests.length > 0 &&
       hasPermission(Permission.MANAGE_REQUESTS) &&
       mediaType === 'tv'
     ) {
@@ -176,20 +189,20 @@ const RequestButton = ({
         {
           id: 'approve-request-batch',
           text: intl.formatMessage(messages.approverequests, {
-            requestCount: activeRequests.length,
+            requestCount: pendingRequests.length,
           }),
           action: () => {
-            modifyRequests(activeRequests, 'approve');
+            modifyRequests(pendingRequests, 'approve');
           },
           svg: <CheckIcon />,
         },
         {
           id: 'decline-request-batch',
           text: intl.formatMessage(messages.declinerequests, {
-            requestCount: activeRequests.length,
+            requestCount: pendingRequests.length,
           }),
           action: () => {
-            modifyRequests(activeRequests, 'decline');
+            modifyRequests(pendingRequests, 'decline');
           },
           svg: <XMarkIcon />,
         }
@@ -199,7 +212,7 @@ const RequestButton = ({
     if (
       active4kRequest &&
       (active4kRequest.requestedBy.id === user?.id ||
-        (active4kRequests?.length === 1 &&
+        (open4kRequests?.length === 1 &&
           hasPermission(Permission.MANAGE_REQUESTS)))
     ) {
       buttons.push({
@@ -214,7 +227,8 @@ const RequestButton = ({
     }
 
     if (
-      active4kRequest &&
+      pending4kRequests &&
+      pending4kRequests.length > 0 &&
       hasPermission(Permission.MANAGE_REQUESTS) &&
       mediaType === 'movie'
     ) {
@@ -223,7 +237,7 @@ const RequestButton = ({
           id: 'approve-4k-request',
           text: intl.formatMessage(messages.approverequest4k),
           action: () => {
-            modifyRequest(active4kRequest, 'approve');
+            modifyRequest(pending4kRequests[0], 'approve');
           },
           svg: <CheckIcon />,
         },
@@ -231,14 +245,14 @@ const RequestButton = ({
           id: 'decline-4k-request',
           text: intl.formatMessage(messages.declinerequest4k),
           action: () => {
-            modifyRequest(active4kRequest, 'decline');
+            modifyRequest(pending4kRequests[0], 'decline');
           },
           svg: <XMarkIcon />,
         }
       );
     } else if (
-      active4kRequests &&
-      active4kRequests.length > 0 &&
+      pending4kRequests &&
+      pending4kRequests.length > 0 &&
       hasPermission(Permission.MANAGE_REQUESTS) &&
       mediaType === 'tv'
     ) {
@@ -246,20 +260,20 @@ const RequestButton = ({
         {
           id: 'approve-4k-request-batch',
           text: intl.formatMessage(messages.approve4krequests, {
-            requestCount: active4kRequests.length,
+            requestCount: pending4kRequests.length,
           }),
           action: () => {
-            modifyRequests(active4kRequests, 'approve');
+            modifyRequests(pending4kRequests, 'approve');
           },
           svg: <CheckIcon />,
         },
         {
           id: 'decline-4k-request-batch',
           text: intl.formatMessage(messages.decline4krequests, {
-            requestCount: active4kRequests.length,
+            requestCount: pending4kRequests.length,
           }),
           action: () => {
-            modifyRequests(active4kRequests, 'decline');
+            modifyRequests(pending4kRequests, 'decline');
           },
           svg: <XMarkIcon />,
         }
@@ -272,6 +286,7 @@ const RequestButton = ({
     (!media ||
       media.status === MediaStatus.UNKNOWN ||
       (media.status === MediaStatus.DELETED && !activeRequest)) &&
+    !activeRequest &&
     hasPermission(
       [
         Permission.REQUEST,
@@ -317,6 +332,7 @@ const RequestButton = ({
     (!media ||
       media.status4k === MediaStatus.UNKNOWN ||
       (media.status4k === MediaStatus.DELETED && !active4kRequest)) &&
+    !active4kRequest &&
     hasPermission(
       [
         Permission.REQUEST_4K,
