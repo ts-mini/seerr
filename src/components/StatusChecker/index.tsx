@@ -42,6 +42,14 @@ const StatusChecker = () => {
     return null;
   }
 
+  const frontendCommitTag = process.env.commitTag;
+  const shouldShowAppUpdated =
+    !!frontendCommitTag &&
+    frontendCommitTag !== 'local' &&
+    !!data.commitTag &&
+    data.commitTag !== 'local' &&
+    data.commitTag !== frontendCommitTag;
+
   return (
     <Transition
       as={Fragment}
@@ -55,7 +63,7 @@ const StatusChecker = () => {
       show={
         !alertDismissed &&
         ((hasPermission(Permission.ADMIN) && data.restartRequired) ||
-          data.commitTag !== process.env.commitTag)
+          shouldShowAppUpdated)
       }
     >
       {hasPermission(Permission.ADMIN) && data.restartRequired ? (
@@ -64,7 +72,7 @@ const StatusChecker = () => {
           backgroundClickable={false}
           onOk={() => {
             setAlertDismissed(true);
-            if (data.commitTag !== process.env.commitTag) {
+            if (shouldShowAppUpdated) {
               location.reload();
             }
           }}
