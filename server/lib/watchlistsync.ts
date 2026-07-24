@@ -1,5 +1,5 @@
 import PlexTvAPI from '@server/api/plextv';
-import { MediaStatus, MediaType } from '@server/constants/media';
+import { MediaRequestStatus, MediaStatus, MediaType } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import {
@@ -97,11 +97,38 @@ class WatchlistSync {
         .map((r) => `${r.media.mediaType}:${r.media.tmdbId}`)
     );
 
+    // Also skip items that already have any active (non-declined, non-completed)
+    // request — e.g. a manually-approved request waiting on Radarr/Sonarr.
+    const activeRequests: MediaRequest[] =
+      watchlistTmdbIds.length > 0
+        ? await requestRepository
+            .createQueryBuilder('request')
+            .leftJoinAndSelect('request.media', 'media')
+            .where('media.tmdbId IN (:...tmdbIds)', {
+              tmdbIds: watchlistTmdbIds,
+            })
+            .andWhere('request.status NOT IN (:...terminalStatuses)', {
+              terminalStatuses: [
+                MediaRequestStatus.DECLINED,
+                MediaRequestStatus.COMPLETED,
+                MediaRequestStatus.FAILED,
+              ],
+            })
+            .getMany()
+        : [];
+
+    const activeRequestTmdbIds = new Set(
+      activeRequests
+        .filter((r) => r.media != null)
+        .map((r) => `${r.media.mediaType}:${r.media.tmdbId}`)
+    );
+
     const unavailableItems = response.items.filter((i) => {
       const itemMediaType = i.type === 'show' ? MediaType.TV : MediaType.MOVIE;
 
       return (
         !autoRequestedTmdbIds.has(`${itemMediaType}:${i.tmdbId}`) &&
+        !activeRequestTmdbIds.has(`${itemMediaType}:${i.tmdbId}`) &&
         !mediaItems.find(
           (m) =>
             m.tmdbId === i.tmdbId &&
