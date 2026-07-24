@@ -33,6 +33,7 @@ const messages = defineMessages('components.RequestModal', {
   errorediting: 'Something went wrong while editing the request.',
   requestedited: 'Request for <strong>{title}</strong> edited successfully!',
   requestApproved: 'Request for <strong>{title}</strong> approved!',
+  requestAlreadyExists: 'Request for <strong>{title}</strong> already exists.',
   requesterror: 'Something went wrong while submitting the request.',
   pendingapproval: 'Your request is pending approval.',
 });
@@ -78,6 +79,25 @@ const MovieRequestModal = ({
 
   const sendRequest = useCallback(async () => {
     setIsUpdating(true);
+
+    if (data?.hasActiveRequest) {
+      if (onComplete) {
+        onComplete(MediaStatus.PENDING);
+      }
+
+      addToast(
+        <span>
+          {intl.formatMessage(messages.requestAlreadyExists, {
+            title: data?.title,
+            strong: (msg: React.ReactNode) => <strong>{msg}</strong>,
+          })}
+        </span>,
+        { appearance: 'info', autoDismiss: true }
+      );
+
+      setIsUpdating(false);
+      return;
+    }
 
     try {
       let overrideParams = {};
@@ -125,11 +145,32 @@ const MovieRequestModal = ({
           { appearance: 'success', autoDismiss: true }
         );
       }
-    } catch {
-      addToast(intl.formatMessage(messages.requesterror), {
-        appearance: 'error',
-        autoDismiss: true,
-      });
+    } catch (error) {
+      const duplicateMessage =
+        axios.isAxiosError<{ message?: string }>(error) &&
+        error.response?.data?.message ===
+          'Request for this media already exists.';
+
+      if (duplicateMessage) {
+        if (onComplete) {
+          onComplete(MediaStatus.PENDING);
+        }
+
+        addToast(
+          <span>
+            {intl.formatMessage(messages.requestAlreadyExists, {
+              title: data?.title,
+              strong: (msg: React.ReactNode) => <strong>{msg}</strong>,
+            })}
+          </span>,
+          { appearance: 'info', autoDismiss: true }
+        );
+      } else {
+        addToast(intl.formatMessage(messages.requesterror), {
+          appearance: 'error',
+          autoDismiss: true,
+        });
+      }
     } finally {
       setIsUpdating(false);
     }
