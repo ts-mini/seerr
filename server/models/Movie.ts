@@ -82,7 +82,6 @@ export interface MovieDetails {
   };
   mediaInfo?: Media;
   hasActiveRequest?: boolean;
-  hasActiveRequest: false,
   externalIds: ExternalIds;
   mediaUrl?: string;
   watchProviders?: WatchProviders[];
@@ -147,6 +146,7 @@ export const mapMovieDetails = (
     : undefined,
   externalIds: mapExternalIds(movie.external_ids),
   mediaInfo: media,
+  hasActiveRequest: false,
   watchProviders: mapWatchProviders(movie['watch/providers']?.results ?? {}),
   keywords: movie.keywords.keywords.map((keyword) => ({
     id: keyword.id,
