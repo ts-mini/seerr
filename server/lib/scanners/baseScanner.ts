@@ -92,6 +92,7 @@ class BaseScanner<T> {
 
     const existing = await mediaRepository.findOne({
       where: { tmdbId: tmdbId, mediaType },
+      relations: { requests: true },
     });
 
     return existing;
@@ -120,12 +121,13 @@ class BaseScanner<T> {
 
       if (existing) {
         let changedExisting = false;
+        let shouldDeclineApprovedRequests = false;
 
         if (existing[is4k ? 'status4k' : 'status'] !== MediaStatus.AVAILABLE) {
           const statusField = is4k ? 'status4k' : 'status';
           const previousStatus = existing[statusField];
 
-          existing[statusField] =
+          const nextStatus =
             !processing && hasFile
               ? MediaStatus.AVAILABLE
               : !processing &&
@@ -138,7 +140,13 @@ class BaseScanner<T> {
                     : MediaStatus.PROCESSING
                   : previousStatus;
 
+          existing[statusField] = nextStatus;
+
           if (existing[statusField] !== previousStatus) {
+            shouldDeclineApprovedRequests =
+              previousStatus === MediaStatus.PROCESSING &&
+              nextStatus === MediaStatus.UNKNOWN;
+
             if (mediaAddedAt) {
               existing.mediaAddedAt = mediaAddedAt;
             }
@@ -204,6 +212,11 @@ class BaseScanner<T> {
 
         if (changedExisting) {
           await mediaRepository.save(existing);
+
+          if (shouldDeclineApprovedRequests) {
+            await this.declineOrphanedRequests(existing, is4k);
+          }
+
           this.log(
             `Media for ${title} exists. Changes were detected and the title will be updated.`,
             'info'
@@ -673,7 +686,7 @@ class BaseScanner<T> {
       this.log(
         `Declined orphaned ${
           media.mediaType === MediaType.MOVIE ? 'movie' : 'series'
-        } request ${request.id} for ${media.tmdbId} not found in any Sonarr/Radarr server.`,
+        } request ${request.id} for ${media.tmdbId} after media became unfulfillable.`,
         'info'
       );
     }
