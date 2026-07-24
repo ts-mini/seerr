@@ -50,7 +50,7 @@ import {
 } from '@heroicons/react/24/solid';
 import { type RatingResponse } from '@server/api/ratings';
 import { IssueStatus } from '@server/constants/issue';
-import { MediaStatus, MediaType } from '@server/constants/media';
+import { MediaRequestStatus, MediaStatus, MediaType } from '@server/constants/media';
 import { MediaServerType } from '@server/constants/server';
 import type { MovieDetails as MovieDetailsType } from '@server/models/Movie';
 import axios from 'axios';
@@ -196,6 +196,12 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
   if (!data) {
     return <ErrorPage statusCode={404} />;
   }
+
+  const hasActiveRequest = data.mediaInfo?.requests?.some(
+    (request) =>
+      request.status !== MediaRequestStatus.DECLINED &&
+      request.status !== MediaRequestStatus.COMPLETED
+  );
 
   const showAllStudios = data.productionCompanies.length <= minStudios + 1;
   const mediaLinks: PlayButtonLink[] = [];
@@ -576,6 +582,11 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
                   serviceUrl={data.mediaInfo?.serviceUrl4k}
                 />
               )}
+            {hasActiveRequest && (
+              <div className="mt-2">
+                <Tag>{intl.formatMessage(globalMessages.requested)}</Tag>
+              </div>
+            )}
           </div>
           <h1 data-testid="media-title">
             {data.title}{' '}
