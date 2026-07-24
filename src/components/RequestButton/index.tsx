@@ -49,6 +49,7 @@ interface RequestButtonProps {
   onUpdate: () => void;
   tmdbId: number;
   media?: Media;
+  hasActiveRequest?: boolean;
   isShowComplete?: boolean;
   is4kShowComplete?: boolean;
 }
@@ -58,6 +59,7 @@ const RequestButton = ({
   onUpdate,
   media,
   mediaType,
+  hasActiveRequest = false,
   isShowComplete = false,
   is4kShowComplete = false,
 }: RequestButtonProps) => {
@@ -287,6 +289,7 @@ const RequestButton = ({
       media.status === MediaStatus.UNKNOWN ||
       (media.status === MediaStatus.DELETED && !activeRequest)) &&
     !activeRequest &&
+    !hasActiveRequest &&
     hasPermission(
       [
         Permission.REQUEST,

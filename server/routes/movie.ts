@@ -2,9 +2,10 @@ import IMDBRadarrProxy from '@server/api/rating/imdbRadarrProxy';
 import RottenTomatoes from '@server/api/rating/rottentomatoes';
 import { type RatingResponse } from '@server/api/ratings';
 import TheMovieDb from '@server/api/themoviedb';
-import { MediaType } from '@server/constants/media';
+import { MediaRequestStatus, MediaType } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
+import { MediaRequest } from '@server/entity/MediaRequest';
 import { Watchlist } from '@server/entity/Watchlist';
 import logger from '@server/logger';
 import { mapMovieDetails } from '@server/models/Movie';
@@ -23,6 +24,20 @@ movieRoutes.get('/:id', async (req, res, next) => {
     });
 
     const media = await Media.getMedia(tmdbMovie.id, MediaType.MOVIE);
+    const activeRequestCount = await getRepository(MediaRequest)
+      .createQueryBuilder('request')
+      .leftJoin('request.media', 'media')
+      .where('media.tmdbId = :tmdbId', { tmdbId: Number(req.params.id) })
+      .andWhere('media.mediaType = :mediaType', {
+        mediaType: MediaType.MOVIE,
+      })
+      .andWhere('request.status NOT IN (:...terminalStatuses)', {
+        terminalStatuses: [
+          MediaRequestStatus.DECLINED,
+          MediaRequestStatus.COMPLETED,
+        ],
+      })
+      .getCount();
 
     const onUserWatchlist = await getRepository(Watchlist).exist({
       where: {
@@ -35,6 +50,7 @@ movieRoutes.get('/:id', async (req, res, next) => {
     });
 
     const data = mapMovieDetails(tmdbMovie, media, onUserWatchlist);
+    data.hasActiveRequest = activeRequestCount > 0;
 
     // TMDB issue where it doesnt fallback to English when no overview is available in requested locale.
     if (!data.overview) {

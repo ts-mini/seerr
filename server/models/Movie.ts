@@ -81,6 +81,8 @@ export interface MovieDetails {
     backdropPath?: string;
   };
   mediaInfo?: Media;
+  hasActiveRequest?: boolean;
+  hasActiveRequest: false,
   externalIds: ExternalIds;
   mediaUrl?: string;
   watchProviders?: WatchProviders[];

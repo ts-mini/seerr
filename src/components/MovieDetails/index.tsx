@@ -201,7 +201,7 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
     (request) =>
       request.status !== MediaRequestStatus.DECLINED &&
       request.status !== MediaRequestStatus.COMPLETED
-  );
+  ) ?? data.hasActiveRequest;
 
   const showAllStudios = data.productionCompanies.length <= minStudios + 1;
   const mediaLinks: PlayButtonLink[] = [];
@@ -667,6 +667,7 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
           <RequestButton
             mediaType="movie"
             media={data.mediaInfo}
+            hasActiveRequest={hasActiveRequest}
             tmdbId={data.id}
             onUpdate={() => revalidate()}
           />
