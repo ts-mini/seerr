@@ -144,13 +144,10 @@ export class MediaRequest {
         ? await tmdb.getMovie({ movieId: requestBody.mediaId })
         : await tmdb.getTvShow({ tvId: requestBody.mediaId });
 
-    let media = await mediaRepository.findOne({
-      where: {
-        tmdbId: requestBody.mediaId,
-        mediaType: requestBody.mediaType,
-      },
-      relations: ['requests'],
-    });
+    let media = await Media.getMedia(
+      requestBody.mediaId,
+      requestBody.mediaType
+    );
 
     if (!media) {
       media = new Media({

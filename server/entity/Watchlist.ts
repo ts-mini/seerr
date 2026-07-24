@@ -114,12 +114,10 @@ export class Watchlist implements WatchlistItem {
       throw new DuplicateWatchlistRequestError();
     }
 
-    let media = await mediaRepository.findOne({
-      where: {
-        tmdbId: watchlistRequest.tmdbId,
-        mediaType: watchlistRequest.mediaType,
-      },
-    });
+    let media = await Media.getMedia(
+      watchlistRequest.tmdbId,
+      watchlistRequest.mediaType
+    );
 
     if (!media) {
       media = new Media({

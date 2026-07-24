@@ -29,6 +29,58 @@ import Season from './Season';
 @Entity()
 @Index(['tmdbId', 'mediaType'])
 class Media {
+  private static scoreMediaRecord(media: Media): number {
+    let score = 0;
+
+    if (media.requests?.length) {
+      score += media.requests.length * 100;
+    }
+
+    if (media.issues?.length) {
+      score += media.issues.length * 10;
+    }
+
+    if (media.watchlists?.length) {
+      score += media.watchlists.length * 5;
+    }
+
+    if (media.status !== MediaStatus.UNKNOWN) {
+      score += 3;
+    }
+
+    if (media.status4k !== MediaStatus.UNKNOWN) {
+      score += 2;
+    }
+
+    if (
+      media.serviceId ||
+      media.serviceId4k ||
+      media.externalServiceId ||
+      media.externalServiceId4k ||
+      media.ratingKey ||
+      media.ratingKey4k ||
+      media.jellyfinMediaId ||
+      media.jellyfinMediaId4k
+    ) {
+      score += 1;
+    }
+
+    return score;
+  }
+
+  private static selectCanonicalMedia(records: Media[]): Media | undefined {
+    return [...records].sort((left, right) => {
+      const scoreDelta =
+        Media.scoreMediaRecord(right) - Media.scoreMediaRecord(left);
+
+      if (scoreDelta !== 0) {
+        return scoreDelta;
+      }
+
+      return right.id - left.id;
+    })[0];
+  }
+
   public static async getRelatedMedia(
     user: User | undefined,
     items: { tmdbId: number; mediaType: string }[]
@@ -49,13 +101,26 @@ class Media {
           'watchlist',
           'media.id= watchlist.media and watchlist.requestedBy = :userId',
           { userId: user?.id }
-        ) //,
+        )
         .where(' media.tmdbId in (:...finalIds)', { finalIds })
         .getMany();
 
-      return media.filter((m) =>
-        items.some((i) => i.tmdbId === m.tmdbId && i.mediaType === m.mediaType)
-      );
+      const mediaMap = new Map<string, Media[]>();
+
+      for (const record of media) {
+        const key = `${record.mediaType}:${record.tmdbId}`;
+        const existing = mediaMap.get(key) ?? [];
+        existing.push(record);
+        mediaMap.set(key, existing);
+      }
+
+      return items
+        .map((item) =>
+          Media.selectCanonicalMedia(
+            mediaMap.get(`${item.mediaType}:${item.tmdbId}`) ?? []
+          )
+        )
+        .filter((record): record is Media => record !== undefined);
     } catch (e) {
       logger.error(e.message);
       return [];
@@ -69,12 +134,12 @@ class Media {
     const mediaRepository = getRepository(Media);
 
     try {
-      const media = await mediaRepository.findOne({
+      const media = await mediaRepository.find({
         where: { tmdbId: id, mediaType: mediaType },
         relations: { requests: true, issues: true },
       });
 
-      return media ?? undefined;
+      return Media.selectCanonicalMedia(media);
     } catch (e) {
       logger.error(e.message);
       return undefined;
